@@ -1,0 +1,13 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+
+# Your rule content
+After completing the task, always perform a pre-compile test to check for errors. If any errors are found, resolve them until you achieve an error-free compilation.
+
+Before starting the localhost server, ensure you terminate any running instance and restart it on port 3000. Strictly follow this rule: Always run your website on localhost:3000.
+
+- You can @ files here
+- You can use markdown but dont have to
