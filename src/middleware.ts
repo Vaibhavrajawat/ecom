@@ -27,7 +27,19 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  // Add more route protection logic here if needed
+  // Protect user dashboard routes
+  if (pathname.startsWith("/user/dashboard")) {
+    if (!token) {
+      const url = new URL("/api/auth/signin", request.url);
+      url.searchParams.set("callbackUrl", encodeURI(request.url));
+      return NextResponse.redirect(url);
+    }
+    return NextResponse.next();
+  }
 
   return NextResponse.next();
 }
+
+export const config = {
+  matcher: ["/user/dashboard/:path*", "/api/auth/:path*"],
+};

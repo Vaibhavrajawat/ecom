@@ -6,7 +6,7 @@ import { CartAnimationProvider } from "@/contexts/CartAnimationContext";
 import { AddToCartAnimation } from "@/components/ui/add-to-cart-animation";
 import { cn } from "@/lib/utils";
 import { ThemeProvider } from "next-themes";
-import prisma from "@/lib/prisma";
+import { prisma } from "@/lib/prisma";
 import { Toaster } from "sonner";
 
 const geistSans = Geist({
@@ -14,24 +14,33 @@ const geistSans = Geist({
   variable: "--font-geist-sans",
 });
 
+const defaultSettings = {
+  title: "PrimeStore",
+  metaDescription: "Your one-stop shop for digital subscriptions",
+  faviconUrl: null,
+};
+
 async function getSiteSettings() {
   try {
-    return (
-      (await prisma.siteSettings.findFirst({
-        where: { id: "default" },
-      })) || {
-        title: "Ecom",
-        metaDescription: "Default description",
-        faviconUrl: null,
-      }
-    );
+    const settings = await prisma.siteSettings.findFirst({
+      where: { id: "default" },
+    });
+
+    if (!settings) {
+      // Create default settings if they don't exist
+      await prisma.siteSettings.create({
+        data: {
+          id: "default",
+          ...defaultSettings,
+        },
+      });
+      return defaultSettings;
+    }
+
+    return settings;
   } catch (error) {
     console.error("Error fetching site settings:", error);
-    return {
-      title: "Ecom",
-      metaDescription: "Default description",
-      faviconUrl: null,
-    };
+    return defaultSettings;
   }
 }
 

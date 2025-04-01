@@ -19,12 +19,16 @@ import { formatPrice } from "@/lib/utils";
 import prisma from "@/lib/prisma";
 import { Navbar } from "@/components/navbar";
 import { Footer } from "@/components/footer";
+import { PrismaClient } from "@prisma/client";
+
+// Initialize Prisma client
+const prismaClient = new PrismaClient();
 
 // Direct database query instead of API route
 async function getProduct(slug: string) {
   try {
     // Query the database directly instead of using an API route
-    const product = await prisma.product.findUnique({
+    const product = await prismaClient.product.findUnique({
       where: {
         slug,
       },
@@ -35,7 +39,7 @@ async function getProduct(slug: string) {
 
     // If not found by slug, try by ID (for backward compatibility)
     if (!product) {
-      const productById = await prisma.product.findUnique({
+      const productById = await prismaClient.product.findUnique({
         where: {
           id: slug,
         },
@@ -61,7 +65,7 @@ async function getProduct(slug: string) {
 // Get related products from the same category
 async function getRelatedProducts(categoryId: string, productId: string) {
   try {
-    const relatedProducts = await prisma.product.findMany({
+    const relatedProducts = await prismaClient.product.findMany({
       where: {
         categoryId,
         id: { not: productId },
@@ -78,6 +82,26 @@ async function getRelatedProducts(categoryId: string, productId: string) {
     console.error("Error fetching related products:", error);
     return [];
   }
+}
+
+export async function generateMetadata({
+  params,
+}: {
+  params: { slug: string };
+}) {
+  const product = await getProduct(params.slug);
+
+  if (!product) {
+    return {
+      title: "Product Not Found",
+      description: "The requested product could not be found.",
+    };
+  }
+
+  return {
+    title: `${product.name} | Your Store`,
+    description: product.description,
+  };
 }
 
 export default async function ProductPage({
@@ -139,13 +163,19 @@ export default async function ProductPage({
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
             {/* Product Image */}
             <div className="relative aspect-square rounded-lg overflow-hidden bg-muted">
-              <Image
-                src={product.imageUrl}
-                alt={product.name}
-                fill
-                className="object-cover"
-                priority
-              />
+              {product.imageUrl ? (
+                <Image
+                  src={product.imageUrl}
+                  alt={product.name}
+                  fill
+                  className="object-cover"
+                  priority
+                />
+              ) : (
+                <div className="w-full h-full bg-gray-200 flex items-center justify-center">
+                  <p className="text-gray-500">No image available</p>
+                </div>
+              )}
               {product.salePrice && product.salePrice < product.price && (
                 <Badge variant="destructive" className="absolute top-4 right-4">
                   {Math.round((1 - product.salePrice / product.price) * 100)}%

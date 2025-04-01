@@ -1,17 +1,33 @@
-import prisma from "@/lib/prisma";
+import { prisma } from "@/lib/prisma";
 import { NextResponse } from "next/server";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/lib/auth";
 
 // GET all orders
 export async function GET() {
   try {
+    const session = await getServerSession(authOptions);
+
+    if (!session?.user?.id) {
+      return NextResponse.json(
+        { error: "Authentication required" },
+        { status: 401 }
+      );
+    }
+
+    const userId = session.user.id;
+
+    // Fetch orders for the current user only
     const orders = await prisma.order.findMany({
+      where: {
+        userId,
+      },
       include: {
         items: {
           include: {
             product: true,
           },
         },
-        user: true,
       },
       orderBy: {
         createdAt: "desc",
@@ -31,22 +47,23 @@ export async function GET() {
 // POST a new order
 export async function POST(request: Request) {
   try {
-    const { userId, items } = await request.json();
+    const session = await getServerSession(authOptions);
 
-    if (!userId || !items || !Array.isArray(items) || items.length === 0) {
+    if (!session?.user?.id) {
+      return NextResponse.json(
+        { error: "Authentication required" },
+        { status: 401 }
+      );
+    }
+
+    const userId = session.user.id;
+    const { items } = await request.json();
+
+    if (!items || !Array.isArray(items) || items.length === 0) {
       return NextResponse.json(
         { error: "Invalid request body" },
         { status: 400 }
       );
-    }
-
-    // Verify that the user exists
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-    });
-
-    if (!user) {
-      return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
 
     // Get product details for all items
@@ -96,8 +113,12 @@ export async function POST(request: Request) {
             product: true,
           },
         },
-        user: true,
       },
+    });
+
+    // If order created successfully, clear the cart
+    await prisma.cartItem.deleteMany({
+      where: { userId },
     });
 
     return NextResponse.json({ order }, { status: 201 });

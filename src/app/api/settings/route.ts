@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import prisma from "@/lib/prisma";
+import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { writeFile } from "fs/promises";
 import path from "path";

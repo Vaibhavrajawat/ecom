@@ -1,20 +1,21 @@
-import prisma from "@/lib/prisma";
 import { NextResponse } from "next/server";
-import bcrypt from "bcrypt";
+import { prisma } from "@/lib/prisma";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/lib/auth";
+import bcrypt from "bcryptjs";
 
 // GET all users
 export async function GET() {
   try {
+    const session = await getServerSession(authOptions);
+
+    // Check if user is authenticated and is an admin
+    if (!session?.user || session.user.role !== "ADMIN") {
+      return new NextResponse("Unauthorized", { status: 401 });
+    }
+
     const users = await prisma.user.findMany({
-      select: {
-        id: true,
-        name: true,
-        email: true,
-        phone: true,
-        image: true,
-        role: true,
-        createdAt: true,
-        updatedAt: true,
+      include: {
         orders: true,
       },
       orderBy: {
@@ -22,46 +23,44 @@ export async function GET() {
       },
     });
 
-    return NextResponse.json({ users }, { status: 200 });
+    return NextResponse.json({ users });
   } catch (error) {
-    console.error("Error fetching users:", error);
-    return NextResponse.json(
-      { error: "Error fetching users" },
-      { status: 500 }
-    );
+    console.error("[USERS_GET]", error);
+    return new NextResponse("Internal error", { status: 500 });
   }
 }
 
 // POST create a new user
-export async function POST(request: Request) {
+export async function POST(req: Request) {
   try {
-    const body = await request.json();
-    const { name, email, password, image, phone, role } = body;
+    const session = await getServerSession(authOptions);
 
-    // Validate required fields
-    if (!email || !password) {
-      return NextResponse.json(
-        { error: "Email and password are required" },
-        { status: 400 }
-      );
+    // Check if user is authenticated and is an admin
+    if (!session?.user || session.user.role !== "ADMIN") {
+      return new NextResponse("Unauthorized", { status: 401 });
     }
 
-    // Check if user with same email already exists
+    const body = await req.json();
+    const { name, email, password, image, phone, role } = body;
+
+    if (!email || !name || !password) {
+      return new NextResponse("Missing required fields", { status: 400 });
+    }
+
+    // Check if user with email already exists
     const existingUser = await prisma.user.findUnique({
       where: { email },
     });
 
     if (existingUser) {
-      return NextResponse.json(
-        { error: "User with this email already exists" },
-        { status: 400 }
-      );
+      return new NextResponse("User with this email already exists", {
+        status: 400,
+      });
     }
 
-    // Hash password
+    // Hash the password
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // Create the user
     const user = await prisma.user.create({
       data: {
         name,
@@ -69,16 +68,13 @@ export async function POST(request: Request) {
         password: hashedPassword,
         image,
         phone,
-        role: role || "USER",
+        role,
       },
     });
 
-    // Remove password from response
-    const { password: _, ...userWithoutPassword } = user;
-
-    return NextResponse.json({ user: userWithoutPassword }, { status: 201 });
+    return NextResponse.json({ user });
   } catch (error) {
-    console.error("Error creating user:", error);
-    return NextResponse.json({ error: "Error creating user" }, { status: 500 });
+    console.error("[USERS_POST]", error);
+    return new NextResponse("Internal error", { status: 500 });
   }
 }
